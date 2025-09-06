@@ -1,0 +1,739 @@
+---
+title: "A1c Testing Dashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    theme:
+      version: 5
+      bg: "#691B1B"
+      fg: "#FFFFFF"
+      primary: "#333131"
+      base_font:
+        google: Inter Tight
+      heading_font:
+        google: Inter Tight
+      code_font:
+        google: 
+          family: Inter Tight #JetBrains Mono
+          local: true
+    orientation: columns
+    vertical_layout: fill
+    # storyboard: true
+    logo: "https://www.redcross.org/content/dam/redcross/imported-images/redcross-logo.png.img.png"
+---
+
+
+<style type="text/css">
+
+/* Reduce margin and padding for chart titles */
+.chart-title {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+/* Reduce padding within the overall chart container */
+.flex-cell {
+  padding: 5px;
+}
+
+/* Reduce space above the chart title */
+.chart-title {
+  margin-top: 0px; 
+  padding-top: 0px;
+}
+
+/* Reduce space inside the chart box */
+.flex-cell {
+  padding: 2px; /* Adjust this value as needed */
+}
+
+.value-box {
+    height: 91px;
+    margin: 2px;
+    padding: 2px;
+    box-shadow: 8px 7px 4px rgba(56, 29, 29, 0.5);
+    margin-bottom: 2px;
+    margin-top: 2px;
+    }
+/* Decrease space between value and caption */
+.value-box .value {
+  line-height: 1;      /* Adjust the line height */
+  margin-bottom: -3px; /* Move the value closer to the caption */
+  font-size: 24px;
+}
+
+.value-box .caption {
+  margin-top: 0;
+  margin-bottom: 0;/* Remove the top margin from the caption */
+}    
+    
+.value-box .fa {
+      font-size: 8px; /* Adjust as desired */
+      margin-top: 0;
+      margin-bottom: -3;
+    }    
+    
+.panel-body {
+  padding: 0px !important; /* Reduce internal padding of panels */
+}
+.flex-panel {
+  margin-bottom: 0px !important; /* Reduce vertical margin between panels */
+}
+.chart-container { /* Replace with actual class/ID if needed */
+        margin-bottom: 0px; /* Adjust as desired */
+      }
+
+      
+.graph-container {
+  /* Use a linear gradient to create a shaded effect */
+  background: linear-gradient(
+    to bottom,
+    rgba(100, 210, 80, 0.2), /* Light green, transparent */
+    rgba(90, 165, 255, 0.2)  /* Light blue, transparent */
+  );
+  padding: 20px; /* Add padding for visual separation */
+  border-radius: 8px;
+}      
+
+.value-box .icon {
+  font-size:6px;
+}
+
+</style>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+<style>
+.zoomDiv {
+  opacity: 0;
+  position:absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 50;
+  transform: translate(-50%, -50%);
+  box-shadow: 0px 0px 50px #888888;
+  max-height:100%; 
+  overflow: scroll;
+}
+.zoomImg {
+  width: 112%;
+}
+
+
+div.blue pre { background-color:lightblue; }
+div.blue pre.r { background-color:blue; }
+
+</style>
+
+
+<script type="text/javascript">
+  $(document).ready(function() {
+    $('body').prepend("<div class=\"zoomDiv\"><img src=\"\" class=\"zoomImg\"></div>");
+    // onClick function for all plots (img's)
+    $('img:not(.zoomImg)').click(function() {
+      $('.zoomImg').attr('src', $(this).attr('src'));
+      $('.zoomDiv').css({opacity: '1', width: '71%'});
+    });
+    // onClick function for zoomImg
+    $('img.zoomImg').click(function() {
+      $('.zoomDiv').css({opacity: '0', width: '0%'});
+    });
+  });
+</script>
+
+
+```{css, as-is, echo=FALSE}
+storyboard-nav sbframelist ul li {
+    height: auto;
+}
+
+div {padding: 1 !important;}
+a {
+  color: lightblue; /* Change 'green' to your desired color or hex code */
+}
+
+.value-box {
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.active{
+      font-size:12px; /* Adjust as desired */
+    }    
+    
+.container-fluid {
+  max-width: 1000px; /* Adjust this value to your desired max-width */
+}
+
+img {
+  max-width:100%;
+  height: auto;
+}
+
+body {
+  background: linear-gradient(to right, #8A2929, #1A1A1A
+  );
+}
+
+tags$head( 
+    tags$style(HTML(".fa{font-size: 6px;}"))
+  )
+  
+.custom-background {
+  background-color: #F0F8FF; /* AliceBlue - replace with your desired color */
+}  
+
+div.blue pre { background-color:lightblue; }
+div.blue pre.r { background-color:blue; }
+
+.my_pink2 { background-color: rgb(235, 230, 230); color: white; border: 0px solid black; }
+```
+
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+library(ggpubr)
+library(RColorBrewer)
+library(leaflet)
+library(knitr)
+library(DT)
+library(gt)
+library(gtsummary)
+library(plotly)
+library(htmltools)
+library(leaflegend)
+library(ggfx)
+library(ggiraph)
+library(mapview)
+library(tigris)
+library(sf)
+library(flextable)
+
+setwd("E:/ARC/Projects/A1C/shiny/dashboard")
+load("./data/a1c_final.Rdata")
+load("./data/us_states.Rdata")
+load("./data/geo_usa_select.Rdata")
+load("./data/nhanesdat.Rdata")
+data_date <- unique(as.Date(max(a1c_final$donation_dt), format="%b/%d/%Y")) 
+data_date <- format(data_date, "%b %d,'%y")
+```
+
+Column{data-width=75}
+-----------------------------------------------------------------------
+### Donors
+```{r, fig.mobile=TRUE, class.chunk = "graph-container"}
+tcount <- n_distinct(a1c_final$oid_hashed)
+    valueBox(
+      value = shiny::tags$p(tcount, style = "font-size: 8px;"),
+      caption = "donors tested",
+      icon = tags$image('fa-users', style = "font-size: 18px;"),
+      color = "#1F1F1C"
+    # href = '#trip-duration'
+    )
+```
+
+
+### March
+```{r, fig.mobile=TRUE}
+tcount_mar <- a1c_final %>% filter(dplyr::between(donation_dt, as.Date("2025-03-01"), as.Date("2025-04-15"))) %>% n_distinct() 
+    valueBox(
+      tcount_mar,
+      caption ="tests in Mar'25",
+      icon = 'fa-users',
+      color = "#363434"
+    )
+```
+
+
+### August
+```{r, fig.mobile=TRUE}
+tcount_aug <- a1c_final %>% filter(dplyr::between(donation_dt, as.Date("2025-08-01"), as.Date("2025-08-30"))) %>% n_distinct() 
+    valueBox(
+      tcount_aug,
+      caption ="tests in Aug'25",
+      icon = 'fas fa-users',
+      color = "#4A4949"
+    )
+```
+
+### Females
+```{r, fig.mobile=TRUE, echo = FALSE}
+library("shiny")
+# library("shinydashboard")
+    fpercent <- a1c_final %>%
+                group_by(gender) %>% summarise(fcount=n()) %>%
+                mutate(fpercent = round(100*fcount/sum(fcount),digits = 1))
+    valueBox(
+          # paste0(fpercent[1,3], "%"),
+          value = shiny::tags$p(paste0(fpercent[1,3], "%")),
+          caption = 'females', 
+          icon = 'fa-person-dress',
+          color = "#C9A9A9"
+    )
+```
+
+### Males
+```{r, fig.mobile=TRUE, echo = FALSE}
+    fpercent <- a1c_final %>%
+                group_by(gender) %>% summarise(fcount=n()) %>%
+                mutate(fpercent = round(100*fcount/sum(fcount),digits = 1))
+    valueBox(
+          value = shiny::tags$p(paste0(fpercent[2,3], "%"), style = "font-size: 8px; font-face:bold"),
+          caption = 'males',
+          # style = "font-size: 200%;font-family: Helvetica",
+          icon = "fa-person",
+          color = "#C1C1E8"
+    )
+```
+
+
+### prediabetic
+```{r, fig.mobile=TRUE }
+prediabetes_ct <- a1c_final %>% filter(glycemia == "prediabetes") %>%  n_distinct()
+all_ct <- n_distinct(a1c_final$oid_hashed)
+percent_prediabetic <- round(100*prediabetes_ct/all_ct, digits = 1)
+    valueBox(
+      paste0(percent_prediabetic,"%"),
+      caption = 'pre-diabetic',
+      icon = 'fa-droplet',
+      color = "#A40"
+    )
+```
+
+### diabetic
+```{r, fig.mobile=TRUE }
+diabetes_ct <- a1c_final %>% filter(glycemia == "diabetes") %>% n_distinct()
+all_ct <- n_distinct(a1c_final$oid_hashed)
+percent_diabetic <- round(100*diabetes_ct/all_ct, digits = 1)
+    valueBox(
+      paste0(percent_diabetic,"%"),
+      caption = 'diabetic',
+      icon = 'fa-droplet',
+      color = "#C40000"
+    )
+```
+
+
+### till date
+```{r, fig.mobile=TRUE, class.chunk = "graph-container"}
+tcount <- n_distinct(a1c_final$oid_hashed)
+    flexdashboard::valueBox(
+      value = shiny::tags$p(data_date, style = "font-size: 5px;"),
+      caption = "last test date",
+      icon = "fa-calendar",
+      color = "#7D0101"
+    # href = '#trip-duration'
+    )
+```
+
+
+
+
+Column {data-width=650 .tabset}
+-----------------------------------------------------------------------
+
+### Donors
+
+```{r}
+ donorcount <- a1c_final %>% 
+          group_by(zipcode,lat,lng) %>% summarise(donorcount = n()) 
+    z <- tapply(donorcount$donorcount, list(cut(donorcount$lng, 200), cut(donorcount$lat, 200)), mean, na.rm = TRUE)
+    df <- expand.grid(lng = seq(min(donorcount$lng, na.rm = T), max(donorcount$lng, na.rm = T), length = 200),
+                      lat = seq(min(donorcount$lat, na.rm = T), max(donorcount$lat, na.rm = T), length = 200))
+    df$z <- c(tapply(donorcount$donorcount, list(cut(donorcount$lng, 200), cut(donorcount$lat, 200)), mean, na.rm = TRUE))
+    df$z[is.na(df$z)] <- 0
+    
+  ggplot(df, aes(lng, lat)) + 
+      with_shadow(geom_contour_filled(aes(z = z), breaks = c(1, 5, 20, 50, 100, 1000)), colour = "#C7C7C7", sigma = 5) +
+      scale_fill_manual(values = rev(brewer.pal(5, "Spectral")),name = "Donor count\nby zipcode") +
+      xlim(-125, -70 ) +
+      ylim(22, 53) +
+      guides(alpha = guide_none()) +
+      geom_sf(data=us_states, fill=NA, inherit.aes = FALSE, alpha = 0.1) +
+      theme_transparent() +
+    theme(
+    panel.background = element_rect(fill = "transparent", colour = NA), # Panel background
+    plot.background = element_rect(fill = "transparent", colour = NA),  # Plot background
+    panel.grid.major = element_blank(), # Remove major grid lines
+    panel.grid.minor = element_blank(), # Remove minor grid lines
+    legend.background = element_rect(fill = "transparent", colour = NA), # Legend background
+    legend.box.background = element_rect(fill = "transparent", colour = NA) # Legend box background
+  )
+  
+```
+
+> Donor density by zipcode using combined donors counts from Mar'25 and Aug'25 are mapped.
+
+### Diabetics
+
+```{r, fig.mobile=TRUE , fig.width=7.5}
+df <- a1c_final %>% 
+      group_by(age_group, raceeth, glycemia) %>%
+      summarise(counts = n()) %>% mutate(percent = round(counts/sum(counts), digits = 3))
+    ggplot(df, aes(x = glycemia, y = percent)) +
+      geom_bar(
+        aes(fill = raceeth),
+        stat = "identity", position = position_dodge(0.8),
+        width = 0.7
+      ) + coord_flip() +
+      facet_wrap(~age_group) +
+      scale_fill_brewer(direction = -1,palette = "YlOrRd") +
+      geom_text(
+        aes(label = paste0(100*percent,"%"), group = raceeth),
+        position = position_dodge(0.8),
+        vjust = 0.5, hjust = -0.05, size = 5,  angle=0) +
+      scale_y_continuous(labels = scales::percent) +
+      labs(x = "Glycemic Status", fill="Race/Ethnicity", caption = "percent diabetes, prediabetes, and normoglycemia by age | race") + theme_pubclean() + 
+      theme(axis.text.x = element_blank(),
+            axis.ticks.x = element_blank(),
+            axis.text.y = element_text(angle = 0, vjust = 0.5, hjust=1)
+            ) + 
+      theme(legend.position = "top") +
+      theme(panel.grid.major.y = element_blank(),
+            panel.grid.minor.y = element_blank())  +
+      theme(text=element_text(size=12))  +
+    theme(
+    panel.background = element_rect(fill = "transparent", colour = NA), # Panel background
+    plot.background = element_rect(fill = "transparent", colour = NA),  # Plot background
+    panel.grid.major = element_blank(), # Remove major grid lines
+    panel.grid.minor = element_blank(), # Remove minor grid lines
+    legend.background = element_rect(fill = "transparent", colour = NA), # Legend background
+    legend.box.background = element_rect(fill = "transparent", colour = NA), # Legend box background
+        plot.caption = element_text(
+      hjust = 0, # Left-align the caption
+      size = 12,
+      color = "#666565",
+      face = "italic")
+  )
+```
+
+> Percentage of diabetic, prediabetic, and normoglycemic donors by age-group are shown in this barplot. <br> 
+> For every age-group, a higher percentage of black and hispanic donors are diabetic than other races.
+
+### Gender
+
+```{r, fig.mobile=TRUE , fig.width=7.5}
+a1c_final %>% 
+       ggplot(., aes(x = age_group, y = A1c_value, color = gender)) +
+      with_shadow((geom_boxplot(outlier.shape = NA)), colour="#C7C7C7", sigma = 4) +
+      stat_summary(fun = "median", geom = "text", 
+                   aes(label = round(after_stat(y), 2)), 
+                   position = position_dodge(0.9), vjust = -0.5,
+                   size = 6) + 
+      coord_cartesian(ylim =  c(4, 7)) +
+      labs(x = "age group", y="A1c%", caption = "Comparison of A1c% between gender; median values shown") +
+      # facet_wrap(gender ~ ., strip.position = "right", ncol = 1) +
+      theme_pubclean() + 
+      theme(text=element_text(size=17),
+            plot.background = element_rect(fill = "#F5F5F5"))  +
+    theme(
+    panel.background = element_rect(fill = "transparent", colour = NA), # Panel background
+    plot.background = element_rect(fill = "transparent", colour = NA),  # Plot background
+    panel.grid.major = element_blank(), # Remove major grid lines
+    panel.grid.minor = element_blank(), # Remove minor grid lines
+    legend.background = element_rect(fill = "transparent", colour = NA), # Legend background
+    legend.box.background = element_rect(fill = "transparent", colour = NA), # Legend box background
+    plot.caption = element_text(
+      hjust = 0, # Left-align the caption
+      size = 13,
+      color = "#666565",
+      face = "italic"))
+```
+
+> Boxplots for A1c% by age-group are compared between female and male donors. <br>
+> Median values are labeled for each.<br>
+> For each age-group, males have higher median value than females.
+
+### Race
+
+```{r, fig.mobile=TRUE , fig.width=7.5}
+    a1c_final %>% 
+      # filter(raceeth %in% c("Caucasian","African American","Hispanic")) %>%
+      ggplot(., aes(x = age_group, y = A1c_value, color = raceeth)) +
+     with_shadow((geom_boxplot(outlier.shape = NA)), colour="#C7C7C7", sigma = 4) +
+      stat_summary(fun = "median", geom = "text", 
+                   aes(label = round(after_stat(y), 2)), 
+                   position = position_dodge(0.9), vjust = -0.5,
+                   size = 6) + 
+      coord_cartesian(ylim =  c(4, 7)) +
+      labs(x = "age group", y="A1c%", color = "Race", caption = "A1c% compared by age between race/ethinicity; median A1c% labeled") +
+      # facet_wrap(gender ~ ., strip.position = "right", ncol = 1) +
+      theme_pubclean() + 
+      theme(text=element_text(size=17),
+            plot.background = element_rect(fill = "#F5F5F5")) +
+    theme(
+    panel.background = element_rect(fill = "transparent", colour = NA), # Panel background
+    plot.background = element_rect(fill = "transparent", colour = NA),  # Plot background
+    panel.grid.major = element_blank(), # Remove major grid lines
+    panel.grid.minor = element_blank(), # Remove minor grid lines
+    legend.background = element_rect(fill = "transparent", colour = NA), # Legend background
+    legend.box.background = element_rect(fill = "transparent", colour = NA), # Legend box background
+      plot.caption = element_text(
+      hjust = 0, # Left-align the caption
+      size = 13,
+      color = "#666565",
+      face = "italic")
+  )
+```
+
+> Boxplots for A1c% by age-group are compared between asian, black, hispanic, and white donors. <br>
+> Median values are labeled for each.<br>
+> For each age-group, black donors have higher median value than others.
+
+### US estimates
+
+```{r, out.width="\\textwidth", out.height="\\textheight", out.extra="keepaspectratio=false", fig.mobile=TRUE ,  fig.width=7.5}
+library(wesanderson)
+library(patchwork)
+library(survey)
+library(srvyr)
+
+# Weighted  
+nhanes_survey <- nhanesdat %>% as_survey_design(id = SDMVPSU, strata = SDMVSTRA, weight = WTPH2YR, nest = TRUE)
+weightedtable <- svytable(~ glycemia + age_group, nhanes_survey)
+weighteddata <- as.data.frame(weightedtable) %>% group_by(age_group) %>% mutate(total = sum(Freq), 
+                                                                                percent = round((Freq/total), digits=3),
+                                                                                data = "NHANES") %>% 
+  select("age_group", "glycemia", "Freq", "total","percent","data")
+
+# Assign column names Gender, Home_Ownership, and Counts to the data frame 
+colnames(weighteddata) <- c("age_group","glycemia", "count", "total","percent","data") 
+weighteddata <- within(weighteddata, glycemia <- relevel(glycemia, ref = "normal"))
+a1c_final <- within(a1c_final, glycemia <- relevel(glycemia, ref = "normal"))
+arc_data_tolal_group <- a1c_final %>% group_by(age_group) %>% summarise(total = n())
+arc_data <- a1c_final %>% group_by(age_group,glycemia) %>% summarise(count = n()) %>% 
+  left_join(arc_data_tolal_group, by = "age_group") %>% mutate(percent = round((count/total), digits=3),
+                                                               data = "ARC")
+
+# ------------------------------
+# adding RC data
+nhanes_arc_dt <- rbind(weighteddata,arc_data)
+
+wtplot<- ggplot(nhanes_arc_dt, aes(x = glycemia, y = percent, fill = data)) + 
+  with_shadow(geom_bar(stat = "identity", position = position_dodge()), colour="#C7C7C7", sigma = 4) + 
+  facet_grid(~age_group) + 
+  geom_text(aes(label=paste0(100*percent,"%")), group = "data", position=position_dodge(0.9), hjust=0.4, vjust=-0.2, size = 4, angle=0, face="bold")+
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual(values=rev(wes_palette(n=5, name="Zissou1"))) +
+  labs(x = "Population glycemic control by age between RC (red) vs. NHANES (yellow) data", 
+       y = "percent population", 
+       fill = "data",
+       subtitle = "Red Cross donor data compared with US estimated prevalence (NHANES, 2021)",
+       caption = "NHANES data based on A1c tables; diabetes questionnaire not included",
+       # caption = 'NHANES Data: GHB_L.xpt documentation'("https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2021/DataFiles/GHB_L.htm")
+       ) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(face = "bold", color = "black"),
+    axis.title.x = element_text(face = "bold"),
+    # axis.title.y = element_text(face = "bold"),
+    axis.text.y = element_blank(),  # Remove y-axis text
+    axis.ticks.y = element_blank(), # Remove y-axis ticks
+    axis.title.y = element_blank(), # Remove y-axis title
+    legend.position = "bottom",
+    plot.caption = element_text(
+    hjust = 0, # Left-align the caption
+    size = 13,
+    color = "#666565",
+    face = "italic"),
+    rect = element_rect(fill = "transparent"),
+        panel.background = element_rect(fill = "transparent", colour = NA), # Panel background
+    plot.background = element_rect(fill = "transparent", colour = NA),  # Plot background
+    panel.grid.major = element_blank(), # Remove major grid lines
+    panel.grid.minor = element_blank() # Remove minor grid lines
+  )
+wtplot
+```
+
+> US weighted estimates for diabetes and prediabetes, determined from NHANES 2021-2023 A1c lab data, is compared with the subset of Red Cross donor population. <br>
+> For any age group, the percentage of diabetics or prediabetics is higher in the overall US estimated prevalence.
+
+### Clustering
+
+```{r, fig.mobile=TRUE ,  fig.width=7.5}
+pal <- colorNumeric(palette = c("green", "blue", "red"), domain = c(4, 12))
+diab_ct_zip <- a1c_final %>% filter(glycemia == "diabetes") %>%  group_by(state) %>% summarise(diab_ct = n())
+male_ct_zip <- a1c_final %>% filter(gender == "M") %>%  group_by(state) %>% summarise(male_ct = n())
+black_ct_zip <- a1c_final %>% filter(raceeth == "NH Black") %>%  group_by(state) %>% summarise(black_ct = n())
+hispanic_ct_zip <- a1c_final %>% filter(raceeth == "Hispanic Origin") %>%  group_by(state) %>% summarise(hispanic_ct = n())
+
+all_ct_zip <- a1c_final %>% group_by(state) %>% summarise(all_ct = n(), median_age = median(age, na.rm = T))
+diab_zip_perc <- inner_join(all_ct_zip, diab_ct_zip, by = "state") %>% 
+  left_join(male_ct_zip, by = "state") %>%
+  left_join(black_ct_zip, by = "state") %>%
+  left_join(hispanic_ct_zip, by = "state") %>%
+  # left_join(select(a1c_final, zipcode, lng, lat,ruca), by = "state") %>%
+  # left_join(select(a1c_final, state), by = "state") %>%
+  distinct(state, all_ct, diab_ct, male_ct, black_ct, hispanic_ct
+           # , lng, lat,ruca
+           ) %>% 
+  mutate(percent_diabetic = round(100*diab_ct/all_ct, digits = 1),
+         percent_male = round(100*male_ct/all_ct, digits = 1),
+         percent_black = round(100*black_ct/all_ct, digits = 1),
+         percent_hispanic = round(100*hispanic_ct/all_ct, digits = 1)) %>%
+  filter(all_ct > 100) %>%
+  arrange(desc(percent_diabetic)) 
+  # top_n(2000, percent_diab) %>% 
+  # left_join(select(geo_usa, zipcode, post_office_city, population, population_density, occupied_housing_units, median_household_income, county, state))
+
+heatmapdata <- diab_zip_perc %>% select(percent_diabetic, state,  percent_male, percent_black, percent_hispanic) %>%
+                                 slice_max(order_by = percent_diabetic, n = 200) %>% filter(!is.na(state))
+
+heatmapdat <- heatmapdata %>% select(-c(state))
+rownames(heatmapdat) <- heatmapdata$state
+View(heatmapdat)
+library(pheatmap)
+heatmapdat %>%
+  scale() %>% 
+  t() %>% # Transpose
+  pheatmap(cutree_cols = 4) # Create the heatmap
+```
+
+> Hierarchical clustering of the states using heat map simultaneously visualizes the percentage of diabetic donors within a state with the percentages of Black, Hispanic, and male donors. Data values are transformed to a color scale. States with higher percentage of diabetic donors have high percentage of black or hispanic or male donors
+
+### Zipcodes 
+
+```{r, fig.width=7}
+library(crosstalk)
+library(bslib)
+
+pal <- colorNumeric(palette = c("green", "blue", "red"), domain = c(4, 12))
+
+diab_ct_zip <- a1c_final %>% filter(glycemia == "diabetes") %>%  group_by(zipcode) %>% summarise(diab_ct = n())
+all_ct_zip <- a1c_final %>% group_by(zipcode) %>% summarise(all_ct = n())
+diab_zip_perc <- inner_join(all_ct_zip, diab_ct_zip, by = "zipcode") %>% left_join(select(a1c_final, zipcode, lng, lat,ruca), by = "zipcode") %>%
+  distinct(zipcode, all_ct, diab_ct, lng, lat,ruca) %>% mutate(percent_diab = round(100*diab_ct/all_ct, digits = 1)) %>%
+  filter(all_ct > 100) %>%
+  arrange(desc(percent_diab)) %>%
+  # top_n(2000, percent_diab) %>% 
+  left_join(select(geo_usa_select, zipcode, post_office_city, population, median_household_income, county, state)) 
+
+
+# Use crosstalk to create a client-side filter between the map and slider
+a1c_dat <- SharedData$new(diab_zip_perc)
+# map_filter <- filter_slider("diabetic", "% diabetic within a zipcode filter", a1c_dat, ~percent_diab)
+map_filter1 <- filter_slider("diabetic", "Diabetic%", a1c_dat, ~percent_diab)
+# map_filter2 <- filter_slider("donors", "Minimum Donor Count", a1c_dat, ~all_ct)
+
+map_a1c <- leaflet(a1c_dat) |> addTiles() |> 
+  setView(lng = -90.5348, lat = 38.7946, zoom = 3) %>%
+  addCircleMarkers(
+    popup = ~paste0("zipcode: ", zipcode,"<br>",
+                            "city: ", post_office_city,"<br>",
+                        "total donors: ", all_ct,"<br>",
+                        "diabetic%: ", percent_diab,"<br>",
+                        "population: ", population,"<br>",
+                        "rural-urban: ", ruca,"<br>",
+                        "median income: ", median_household_income),
+    color = ~pal(percent_diab), # or color = ~pal(your_numeric_variable)
+    fillOpacity = 0.4,
+    radius = ~percent_diab,
+    stroke = FALSE
+  ) 
+
+page_sidebar(
+  title = "Use filter to select zipcodes by donor diabetes prevalence",
+  sidebar = list(map_filter1),
+  # sidebar (postion = "top"),
+  # Can also put other bslib components here
+  # like cards, value boxes, etc.
+  map_a1c,
+  fillable_mobile = TRUE
+)
+```
+
+> Circles represent zipcodes<br>
+> Zipcodes with high percentage of diabetic donors are colored purple, and with low percentage are green.<br> 
+> Click on a circle to see related information for the specific zipcode in the pop-up<br>
+> Use mouse scroll button to zoom in or out
+
+
+
+### Summary 
+<div class = "my_pink2">
+```{r}
+# remove(a1c_final)
+# setwd("E:/ARC/Projects/A1C/shiny/dashboard")
+# load("./data/a1c_final.Rdata")
+library(gtsummary)
+a1c_final_distinct <- a1c_final%>% distinct(oid_hashed,glycemia,gender,raceeth,age,age_group,median_household_income)
+a1c_final_distinct %>% tbl_summary(by = glycemia,
+                              include = c(gender,raceeth,age,age_group,median_household_income),
+                              label = list(age_group = "age group",
+                                           # hispanic_flag = "hispanic flag",
+                                           # BMI_cat = "BMI category",
+                                           median_household_income = "median household income",
+                                           raceeth = "race/ethnicity"
+                              ), missing = "no",
+                              percent = "row" )%>% add_stat_label() %>%
+                              modify_caption("Donor Characteristics") %>%  
+                              as_flex_table() %>%  
+                              flextable::set_table_properties("autofit")
+      # add_n() %>%
+      # CONVERT TO A {gt} TABLE! VERY IMPORTANT STEP!
+      # as_gt() %>%
+      # tab_header(md("**Donor Characteristics**"))%>% 
+      # as_gtsummary() %>%
+
+
+```
+</div>
+
+
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Donor Count by Age (Mar'25)
+
+```{r donors_mar}
+ageplot <- a1c_final %>% filter(donation_dt < "2025-08-01") %>%  
+  gghistogram(., x = "age", bins = 90,
+                add = "mean", rug = FALSE,
+                color = "gender", fill = "gender",
+                palette = c("#fc83dd","gray" ), alpha = 0.2, main = "Donor age distribution by gender", 
+                font.label = list(size = 13, color = "black")
+    )
+
+ageplot
+# RC_age <- a1c_final %>% select(oid_hashed,age_f)%>% mutate(data="RC") %>% rename(id = oid_hashed)
+# NH_age <- nhanesdat %>% select(SEQN, age_f,) %>% mutate(data="NHANES") %>% rename(id = SEQN)
+# NH_age_survey <- NH_age %>% as_survey_design(id = SDMVPSU, strata = SDMVSTRA, weight = WTINT2YR, nest = TRUE)
+# weightedtable <- svytable(~ glycemia + age_group, nhanes_survey)
+# RC_NH_age <- rbind(RC_age,NH_age)
+# 
+# apyramid::age_pyramid(data = RC_NH_age, age_group = "age_f", split_by = "data", proportional = TRUE)
+# a1c_final$gender <- as.factor(a1c_final$gender)
+# 
+# RC_age <- a1c_final %>%
+#       group_by(age, gender) %>%
+#       summarise(count = sum(n())) %>% # Use the actual population column name
+#       mutate(population = ifelse(gender == "M", -count, count)) %>% # Make male population negative
+#       ungroup()
+# RC_age$age_f <- factor(RC_age$age, levels = rev(unique(RC_age$age)))
+# ggplot(RC_age, aes(x = population, y = age_f, fill = gender)) +
+#       geom_col() +  # Use geom_col() for bar plots from counts
+#       scale_x_continuous(labels = abs) + # Show absolute values on the x-axis
+#       labs(title = "Population Pyramid", x = "Population", y = "Age Group", fill = "Gender") +
+#       coord_flip() + # Flips the axes so age groups are on the y-axis
+#       theme_minimal() # A clean theme for better readability
+
+```
+
+
+### Donor Count by Age (Aug'25)
+
+```{r donors_aug}
+
+ageplot_aug <- a1c_final %>% filter(donation_dt >= "2025-08-01") %>% 
+                gghistogram(., x = "age", bins = 90,
+                add = "mean", rug = FALSE,
+                color = "gender", fill = "gender",
+                palette = c("#fc83dd","gray" ), alpha = 0.2, main = "Donor age distribution by gender", 
+                font.label = list(size = 13, color = "black")
+    )
+
+ageplot_aug
+```
+
